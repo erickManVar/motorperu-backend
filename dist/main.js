@@ -17,6 +17,8 @@ async function bootstrap() {
     });
     app.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
     app.setGlobalPrefix('api/v1');
+    const fastify = app.getHttpAdapter().getInstance();
+    fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
     const port = process.env.PORT || 4000;
     await app.listen(Number(port), '0.0.0.0');
     console.log(`MotorPeru API running on port ${port}`);
