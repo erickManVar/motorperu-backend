@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY .npmrc ./
 
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 COPY . .
 
