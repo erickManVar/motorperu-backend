@@ -24,6 +24,7 @@
     "@nestjs/platform-fastify": "^10.3.10",
     "@nestjs/swagger": "^7.4.0",
     "@nestjs/throttler": "^6.2.1",
+    "@opentelemetry/api": "^1.9.1",
     "better-auth": "^1.2.7",
     "bullmq": "^5.71.1",
     "class-transformer": "^0.5.1",
