@@ -4,13 +4,9 @@ import {
   Get,
   Patch,
   Post,
-  Req,
-  UseGuards,
   UsePipes,
 } from '@nestjs/common';
 import { UsersService, UpdateProfileSchema } from './users.service';
-import { AuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../auth/auth.service';
@@ -21,7 +17,6 @@ const ChangeRoleSchema = z.object({
 });
 
 @Controller('users')
-@UseGuards(AuthGuard, RolesGuard)
 export class UsersController {
   constructor(private usersService: UsersService) {}
 

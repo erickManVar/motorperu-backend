@@ -1,12 +1,9 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Query } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { AuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthUser } from '../auth/auth.service';
 
 @Controller('notifications')
-@UseGuards(AuthGuard, RolesGuard)
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
 

@@ -1,11 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import { eq, count, sql } from 'drizzle-orm';
 import * as schema from '../database/schema';
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject('DRIZZLE') private db: NodePgDatabase<typeof schema>) {}
+  constructor(@Inject('DRIZZLE') private db: PostgresJsDatabase<typeof schema>) {}
 
   async getPendingVerifications() {
     return this.db.query.providerVerifications.findMany({
@@ -47,19 +47,24 @@ export class AdminService {
   }
 
   async getStats() {
-    const [users, listings, bookings] = await Promise.all([
-      this.db.select().from(schema.users),
-      this.db.select().from(schema.listings),
-      this.db.select().from(schema.bookings),
+    const [[userCount], [listingCount], [bookingStats]] = await Promise.all([
+      this.db.select({ value: count() }).from(schema.users),
+      this.db.select({ value: count() }).from(schema.listings),
+      this.db
+        .select({
+          total: count(),
+          completed: sql<number>`COUNT(CASE WHEN ${schema.bookings.estado} = 'COMPLETED' THEN 1 END)`,
+          revenue: sql<string>`COALESCE(SUM(CASE WHEN ${schema.bookings.estado} = 'COMPLETED' THEN ${schema.bookings.comision} ELSE 0 END), 0)`,
+        })
+        .from(schema.bookings),
     ]);
-    const completed = bookings.filter(b => b.estado === 'COMPLETED');
-    const revenue = completed.reduce((sum, b) => sum + Number(b.comision || 0), 0);
+
     return {
-      totalUsers: users.length,
-      totalListings: listings.length,
-      totalBookings: bookings.length,
-      completedBookings: completed.length,
-      totalRevenue: revenue,
+      totalUsers: userCount.value,
+      totalListings: listingCount.value,
+      totalBookings: bookingStats.total,
+      completedBookings: bookingStats.completed,
+      totalRevenue: Number(bookingStats.revenue),
     };
   }
 }

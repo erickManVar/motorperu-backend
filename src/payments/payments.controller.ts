@@ -1,7 +1,5 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { AuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { z } from 'zod';
 
@@ -13,7 +11,6 @@ const CreateChargeSchema = z.object({
 });
 
 @Controller('payments')
-@UseGuards(AuthGuard, RolesGuard)
 export class PaymentsController {
   constructor(private paymentsService: PaymentsService) {}
 

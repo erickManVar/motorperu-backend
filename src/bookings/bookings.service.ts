@@ -70,30 +70,46 @@ export class BookingsService {
     const autoReleaseAt = new Date();
     autoReleaseAt.setDate(autoReleaseAt.getDate() + AUTO_RELEASE_DAYS);
 
+    // Atomic booking creation
     const bookingId = crypto.randomUUID();
-    const [booking] = await this.db.insert(schema.bookings).values({
-      id: bookingId,
-      clientId,
-      listingId: dto.listingId,
-      providerId: listing[0].sellerId,
-      monto: String(monto),
-      comision: String(comision),
-      montoProveedor: String(montoProveedor),
-      estado: culqiChargeId ? 'PAID' : 'PENDING_PAYMENT',
-      culqiChargeId,
-      notas: dto.notas,
-      fechaServicio: dto.fechaServicio ? new Date(dto.fechaServicio) : undefined,
-      autoReleaseAt,
-    }).returning();
+    const booking = await this.db.transaction(async (tx) => {
+      // Re-check listing availability inside transaction
+      const [freshListing] = await tx
+        .select({ estado: schema.listings.estado })
+        .from(schema.listings)
+        .where(eq(schema.listings.id, dto.listingId))
+        .limit(1);
 
-    // Send notification to provider
-    await this.notificationsService.createNotification({
+      if (!freshListing || freshListing.estado !== 'ACTIVE') {
+        throw new BadRequestException('Listing ya no está disponible');
+      }
+
+      const [newBooking] = await tx.insert(schema.bookings).values({
+        id: bookingId,
+        clientId,
+        listingId: dto.listingId,
+        providerId: listing[0].sellerId,
+        monto: String(monto),
+        comision: String(comision),
+        montoProveedor: String(montoProveedor),
+        estado: culqiChargeId ? 'PAID' : 'PENDING_PAYMENT',
+        culqiChargeId,
+        notas: dto.notas,
+        fechaServicio: dto.fechaServicio ? new Date(dto.fechaServicio) : undefined,
+        autoReleaseAt,
+      }).returning();
+
+      return newBooking;
+    });
+
+    // Notification outside transaction (non-critical)
+    this.notificationsService.createNotification({
       userId: listing[0].sellerId,
       titulo: 'Nueva reserva',
       mensaje: `Tienes una nueva reserva para: ${listing[0].titulo}`,
       tipo: 'BOOKING_CREATED',
       metadata: { bookingId },
-    });
+    }).catch(() => {}); // Don't fail booking if notification fails
 
     return booking;
   }

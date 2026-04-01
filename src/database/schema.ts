@@ -10,6 +10,7 @@ import {
   index,
   customType,
 } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 // ─────────────────────────────────────────────
 // CUSTOM TYPES
@@ -288,4 +289,80 @@ export const notifications = pgTable('notifications', {
 }, (table) => ({
   userIdx: index('notif_user_idx').on(table.userId),
   leidaIdx: index('notif_leida_idx').on(table.leida),
+}));
+
+// ─────────────────────────────────────────────
+// RELATIONS (required for Drizzle relational queries)
+// ─────────────────────────────────────────────
+
+export const usersRelations = relations(users, ({ many }) => ({
+  listings: many(listings),
+  sessions: many(sessions),
+  accounts: many(accounts),
+  driverProfile: many(driverProfiles),
+  towingProfile: many(towingProfiles),
+  notifications: many(notifications),
+  bookingsAsClient: many(bookings, { relationName: 'client' }),
+  bookingsAsProvider: many(bookings, { relationName: 'provider' }),
+  reviewsGiven: many(reviews, { relationName: 'reviewer' }),
+  reviewsReceived: many(reviews, { relationName: 'reviewed' }),
+  providerVerifications: many(providerVerifications),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] }),
+}));
+
+export const listingsRelations = relations(listings, ({ one, many }) => ({
+  seller: one(users, { fields: [listings.sellerId], references: [users.id] }),
+  carDetail: one(carDetails),
+  partDetail: one(partDetails),
+  serviceDetail: one(serviceDetails),
+  bookings: many(bookings),
+  reviews: many(reviews),
+}));
+
+export const carDetailsRelations = relations(carDetails, ({ one }) => ({
+  listing: one(listings, { fields: [carDetails.listingId], references: [listings.id] }),
+}));
+
+export const partDetailsRelations = relations(partDetails, ({ one }) => ({
+  listing: one(listings, { fields: [partDetails.listingId], references: [listings.id] }),
+}));
+
+export const serviceDetailsRelations = relations(serviceDetails, ({ one }) => ({
+  listing: one(listings, { fields: [serviceDetails.listingId], references: [listings.id] }),
+}));
+
+export const bookingsRelations = relations(bookings, ({ one }) => ({
+  client: one(users, { fields: [bookings.clientId], references: [users.id], relationName: 'client' }),
+  provider: one(users, { fields: [bookings.providerId], references: [users.id], relationName: 'provider' }),
+  listing: one(listings, { fields: [bookings.listingId], references: [listings.id] }),
+}));
+
+export const driverProfilesRelations = relations(driverProfiles, ({ one }) => ({
+  user: one(users, { fields: [driverProfiles.userId], references: [users.id] }),
+}));
+
+export const towingProfilesRelations = relations(towingProfiles, ({ one }) => ({
+  user: one(users, { fields: [towingProfiles.userId], references: [users.id] }),
+}));
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+  booking: one(bookings, { fields: [reviews.bookingId], references: [bookings.id] }),
+  reviewer: one(users, { fields: [reviews.reviewerId], references: [users.id], relationName: 'reviewer' }),
+  reviewed: one(users, { fields: [reviews.reviewedId], references: [users.id], relationName: 'reviewed' }),
+  listing: one(listings, { fields: [reviews.listingId], references: [listings.id] }),
+}));
+
+export const providerVerificationsRelations = relations(providerVerifications, ({ one }) => ({
+  user: one(users, { fields: [providerVerifications.userId], references: [users.id] }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));

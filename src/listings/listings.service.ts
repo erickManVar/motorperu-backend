@@ -15,8 +15,6 @@ import {
   lte,
   sql,
   desc,
-  ilike,
-  or,
 } from 'drizzle-orm';
 import {
   CreateCarListingDto,
@@ -33,103 +31,118 @@ export class ListingsService {
   async createCar(sellerId: string, dto: CreateCarListingDto) {
     const listingId = crypto.randomUUID();
 
-    const [listing] = await this.db.insert(schema.listings).values({
-      id: listingId,
-      sellerId,
-      tipo: 'CAR',
-      titulo: dto.titulo,
-      descripcion: dto.descripcion,
-      precio: String(dto.precio),
-      fotos: dto.fotos,
-      ubicacion: dto.ubicacion,
-      distrito: dto.distrito,
-      departamento: dto.departamento,
-      latitud: dto.latitud != null ? String(dto.latitud) : undefined,
-      longitud: dto.longitud != null ? String(dto.longitud) : undefined,
-      estado: 'PENDING_REVIEW',
-    }).returning();
+    return this.db.transaction(async (tx) => {
+      const [listing] = await tx.insert(schema.listings).values({
+        id: listingId,
+        sellerId,
+        tipo: 'CAR',
+        titulo: dto.titulo,
+        descripcion: dto.descripcion,
+        precio: String(dto.precio),
+        fotos: dto.fotos,
+        ubicacion: dto.ubicacion,
+        distrito: dto.distrito,
+        departamento: dto.departamento,
+        latitud: dto.latitud != null ? String(dto.latitud) : undefined,
+        longitud: dto.longitud != null ? String(dto.longitud) : undefined,
+        estado: 'PENDING_REVIEW',
+      }).returning();
 
-    await this.db.insert(schema.carDetails).values({
-      listingId,
-      marca: dto.marca,
-      modelo: dto.modelo,
-      anio: dto.anio,
-      kilometraje: dto.kilometraje,
-      combustible: dto.combustible,
-      transmision: dto.transmision,
-      color: dto.color,
-      condicion: dto.condicion,
-      numeroPuertas: dto.numeroPuertas,
-      motor: dto.motor,
-      vin: dto.vin,
+      await tx.insert(schema.carDetails).values({
+        listingId,
+        marca: dto.marca,
+        modelo: dto.modelo,
+        anio: dto.anio,
+        kilometraje: dto.kilometraje,
+        combustible: dto.combustible,
+        transmision: dto.transmision,
+        color: dto.color,
+        condicion: dto.condicion,
+        numeroPuertas: dto.numeroPuertas,
+        motor: dto.motor,
+        vin: dto.vin,
+      });
+
+      await tx.execute(
+        sql`UPDATE listings SET search_vector = to_tsvector('spanish', ${dto.titulo} || ' ' || ${dto.descripcion}) WHERE id = ${listingId}`,
+      );
+
+      return listing;
     });
-
-    await this.updateSearchVector(listingId, dto.titulo, dto.descripcion);
-    return listing;
   }
 
   async createPart(sellerId: string, dto: CreatePartListingDto) {
     const listingId = crypto.randomUUID();
 
-    const [listing] = await this.db.insert(schema.listings).values({
-      id: listingId,
-      sellerId,
-      tipo: 'PART',
-      titulo: dto.titulo,
-      descripcion: dto.descripcion,
-      precio: String(dto.precio),
-      fotos: dto.fotos,
-      ubicacion: dto.ubicacion,
-      distrito: dto.distrito,
-      departamento: dto.departamento,
-      estado: 'PENDING_REVIEW',
-    }).returning();
+    return this.db.transaction(async (tx) => {
+      const [listing] = await tx.insert(schema.listings).values({
+        id: listingId,
+        sellerId,
+        tipo: 'PART',
+        titulo: dto.titulo,
+        descripcion: dto.descripcion,
+        precio: String(dto.precio),
+        fotos: dto.fotos,
+        ubicacion: dto.ubicacion,
+        distrito: dto.distrito,
+        departamento: dto.departamento,
+        estado: 'PENDING_REVIEW',
+      }).returning();
 
-    await this.db.insert(schema.partDetails).values({
-      listingId,
-      marcaCompatible: dto.marcaCompatible,
-      modeloCompatible: dto.modeloCompatible,
-      anioDesde: dto.anioDesde,
-      anioHasta: dto.anioHasta,
-      condicion: dto.condicion,
-      stock: dto.stock,
-      numeroParte: dto.numeroParte,
-      peso: dto.peso != null ? String(dto.peso) : undefined,
+      await tx.insert(schema.partDetails).values({
+        listingId,
+        marcaCompatible: dto.marcaCompatible,
+        modeloCompatible: dto.modeloCompatible,
+        anioDesde: dto.anioDesde,
+        anioHasta: dto.anioHasta,
+        condicion: dto.condicion,
+        stock: dto.stock,
+        numeroParte: dto.numeroParte,
+        peso: dto.peso != null ? String(dto.peso) : undefined,
+      });
+
+      await tx.execute(
+        sql`UPDATE listings SET search_vector = to_tsvector('spanish', ${dto.titulo} || ' ' || ${dto.descripcion}) WHERE id = ${listingId}`,
+      );
+
+      return listing;
     });
-
-    await this.updateSearchVector(listingId, dto.titulo, dto.descripcion);
-    return listing;
   }
 
   async createService(sellerId: string, dto: CreateServiceListingDto) {
     const listingId = crypto.randomUUID();
 
-    const [listing] = await this.db.insert(schema.listings).values({
-      id: listingId,
-      sellerId,
-      tipo: 'SERVICE',
-      titulo: dto.titulo,
-      descripcion: dto.descripcion,
-      precio: String(dto.precio),
-      fotos: dto.fotos,
-      ubicacion: dto.ubicacion,
-      distrito: dto.distrito,
-      departamento: dto.departamento,
-      estado: 'PENDING_REVIEW',
-    }).returning();
+    return this.db.transaction(async (tx) => {
+      const [listing] = await tx.insert(schema.listings).values({
+        id: listingId,
+        sellerId,
+        tipo: 'SERVICE',
+        titulo: dto.titulo,
+        descripcion: dto.descripcion,
+        precio: String(dto.precio),
+        fotos: dto.fotos,
+        ubicacion: dto.ubicacion,
+        distrito: dto.distrito,
+        departamento: dto.departamento,
+        estado: 'PENDING_REVIEW',
+      }).returning();
 
-    await this.db.insert(schema.serviceDetails).values({
-      listingId,
-      tipoServicio: dto.tipoServicio,
-      tiempoEstimado: dto.tiempoEstimado,
-      zonas: dto.zonas,
-      disponibilidad: dto.disponibilidad,
-      precioBase: dto.precioBase != null ? String(dto.precioBase) : undefined,
-      incluyeDesplazamiento: dto.incluyeDesplazamiento,
+      await tx.insert(schema.serviceDetails).values({
+        listingId,
+        tipoServicio: dto.tipoServicio,
+        tiempoEstimado: dto.tiempoEstimado,
+        zonas: dto.zonas,
+        disponibilidad: dto.disponibilidad,
+        precioBase: dto.precioBase != null ? String(dto.precioBase) : undefined,
+        incluyeDesplazamiento: dto.incluyeDesplazamiento,
+      });
+
+      await tx.execute(
+        sql`UPDATE listings SET search_vector = to_tsvector('spanish', ${dto.titulo} || ' ' || ${dto.descripcion}) WHERE id = ${listingId}`,
+      );
+
+      return listing;
     });
-
-    await this.updateSearchVector(listingId, dto.titulo, dto.descripcion);
-    return listing;
   }
 
   async findAll(query: ListingsQueryDto) {
@@ -178,46 +191,26 @@ export class ListingsService {
   }
 
   async findOne(id: string) {
-    const listing = await this.db
-      .select()
-      .from(schema.listings)
-      .where(eq(schema.listings.id, id))
-      .limit(1);
+    // Single relational query instead of N+1
+    const result = await this.db.query.listings.findFirst({
+      where: eq(schema.listings.id, id),
+      with: { carDetail: true, partDetail: true, serviceDetail: true },
+    });
 
-    if (!listing[0]) throw new NotFoundException('Listing no encontrado');
+    if (!result) throw new NotFoundException('Listing no encontrado');
 
-    // Increment view count
-    await this.db
+    // Increment view count (fire and forget)
+    this.db
       .update(schema.listings)
       .set({ viewCount: sql`${schema.listings.viewCount} + 1` })
-      .where(eq(schema.listings.id, id));
+      .where(eq(schema.listings.id, id))
+      .then(() => {})
+      .catch(() => {});
 
-    // Get details based on type
-    let details = null;
-    if (listing[0].tipo === 'CAR') {
-      const car = await this.db
-        .select()
-        .from(schema.carDetails)
-        .where(eq(schema.carDetails.listingId, id))
-        .limit(1);
-      details = car[0] ?? null;
-    } else if (listing[0].tipo === 'PART') {
-      const part = await this.db
-        .select()
-        .from(schema.partDetails)
-        .where(eq(schema.partDetails.listingId, id))
-        .limit(1);
-      details = part[0] ?? null;
-    } else if (listing[0].tipo === 'SERVICE') {
-      const service = await this.db
-        .select()
-        .from(schema.serviceDetails)
-        .where(eq(schema.serviceDetails.listingId, id))
-        .limit(1);
-      details = service[0] ?? null;
-    }
+    const { carDetail, partDetail, serviceDetail, ...listing } = result;
+    const details = carDetail ?? partDetail ?? serviceDetail ?? null;
 
-    return { ...listing[0], details };
+    return { ...listing, details };
   }
 
   async update(id: string, sellerId: string, dto: UpdateListingDto) {
@@ -237,10 +230,8 @@ export class ListingsService {
       .returning();
 
     if (dto.titulo || dto.descripcion) {
-      await this.updateSearchVector(
-        id,
-        dto.titulo ?? listing[0].titulo,
-        dto.descripcion ?? listing[0].descripcion,
+      await this.db.execute(
+        sql`UPDATE listings SET search_vector = to_tsvector('spanish', ${dto.titulo ?? listing[0].titulo} || ' ' || ${dto.descripcion ?? listing[0].descripcion}) WHERE id = ${id}`,
       );
     }
 
@@ -282,15 +273,5 @@ export class ListingsService {
       hasMore,
       nextCursor: hasMore ? items[items.length - 1]?.createdAt?.toISOString() : null,
     };
-  }
-
-  private async updateSearchVector(id: string, titulo: string, descripcion: string) {
-    await this.db.execute(
-      sql`
-        UPDATE listings
-        SET search_vector = to_tsvector('spanish', ${titulo} || ' ' || ${descripcion})
-        WHERE id = ${id}
-      `,
-    );
   }
 }

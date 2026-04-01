@@ -1,11 +1,14 @@
-import { Controller, Get, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body } from '@nestjs/common';
 import { AdminService } from './admin.service';
-import { AuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { z } from 'zod';
+
+const ResolveDisputeSchema = z.object({
+  releaseToClient: z.boolean(),
+});
 
 @Controller('admin')
-@UseGuards(AuthGuard, RolesGuard)
 @Roles('ADMIN')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
@@ -26,7 +29,10 @@ export class AdminController {
   getDisputes() { return this.adminService.getDisputedBookings(); }
 
   @Patch('disputes/:bookingId/resolve')
-  resolveDispute(@Param('bookingId') id: string, @Body() body: { releaseToClient: boolean }) {
+  resolveDispute(
+    @Param('bookingId') id: string,
+    @Body(new ZodValidationPipe(ResolveDisputeSchema)) body: z.infer<typeof ResolveDisputeSchema>,
+  ) {
     return this.adminService.resolveDispute(id, body.releaseToClient);
   }
 }

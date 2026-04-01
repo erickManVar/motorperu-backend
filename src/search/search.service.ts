@@ -1,11 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { sql, and, eq, gte, lte, ilike } from 'drizzle-orm';
 import * as schema from '../database/schema';
 
 @Injectable()
 export class SearchService {
-  constructor(@Inject('DRIZZLE') private db: NodePgDatabase<typeof schema>) {}
+  constructor(@Inject('DRIZZLE') private db: PostgresJsDatabase<typeof schema>) {}
 
   async search(params: {
     q?: string;

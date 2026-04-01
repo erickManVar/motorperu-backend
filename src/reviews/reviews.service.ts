@@ -1,8 +1,8 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DRIZZLE } from '../database/database.module';
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../database/schema';
-import { and, avg, count, desc, eq } from 'drizzle-orm';
+import { avg, count, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 export const CreateReviewSchema = z.object({
@@ -26,27 +26,46 @@ export class ReviewsService {
     if (booking[0].clientId !== reviewerId) throw new ForbiddenException('Solo el cliente puede dejar reseña');
     if (booking[0].estado !== 'COMPLETED') throw new BadRequestException('Solo puedes reseñar servicios completados');
 
-    const existing = await this.db
-      .select()
-      .from(schema.reviews)
-      .where(eq(schema.reviews.bookingId, dto.bookingId))
-      .limit(1);
+    // Use transaction + unique constraint instead of SELECT check (prevents race condition)
+    return this.db.transaction(async (tx) => {
+      try {
+        const [review] = await tx.insert(schema.reviews).values({
+          bookingId: dto.bookingId,
+          reviewerId,
+          reviewedId: booking[0].providerId,
+          listingId: booking[0].listingId,
+          rating: dto.rating,
+          comentario: dto.comentario,
+        }).returning();
 
-    if (existing[0]) throw new BadRequestException('Ya dejaste una reseña para esta reserva');
+        // Update provider's average rating within the same transaction
+        const result = await tx
+          .select({ avg: avg(schema.reviews.rating), count: count() })
+          .from(schema.reviews)
+          .where(eq(schema.reviews.reviewedId, booking[0].providerId));
 
-    const [review] = await this.db.insert(schema.reviews).values({
-      bookingId: dto.bookingId,
-      reviewerId,
-      reviewedId: booking[0].providerId,
-      listingId: booking[0].listingId,
-      rating: dto.rating,
-      comentario: dto.comentario,
-    }).returning();
+        const avgRating = result[0]?.avg ?? '0';
+        const totalReviews = result[0]?.count ?? 0;
 
-    // Update provider's average rating
-    await this.updateProviderRating(booking[0].providerId);
+        await tx
+          .update(schema.driverProfiles)
+          .set({ rating: String(avgRating), totalReviews })
+          .where(eq(schema.driverProfiles.userId, booking[0].providerId));
 
-    return review;
+        await tx
+          .update(schema.towingProfiles)
+          .set({ rating: String(avgRating), totalReviews })
+          .where(eq(schema.towingProfiles.userId, booking[0].providerId));
+
+        return review;
+      } catch (error: any) {
+        // Unique constraint violation on bookingId = duplicate review
+        if (error?.code === '23505') {
+          throw new ConflictException('Ya dejaste una reseña para esta reserva');
+        }
+        throw error;
+      }
+    });
   }
 
   async getListingReviews(listingId: string, cursor?: string, limit = 20) {
@@ -65,27 +84,5 @@ export class ReviewsService {
       .limit(limit);
 
     return reviews;
-  }
-
-  private async updateProviderRating(providerId: string) {
-    const result = await this.db
-      .select({ avg: avg(schema.reviews.rating), count: count() })
-      .from(schema.reviews)
-      .where(eq(schema.reviews.reviewedId, providerId));
-
-    const avgRating = result[0]?.avg ?? '0';
-    const totalReviews = result[0]?.count ?? 0;
-
-    // Update driver profile if exists
-    await this.db
-      .update(schema.driverProfiles)
-      .set({ rating: String(avgRating), totalReviews })
-      .where(eq(schema.driverProfiles.userId, providerId));
-
-    // Update towing profile if exists
-    await this.db
-      .update(schema.towingProfiles)
-      .set({ rating: String(avgRating), totalReviews })
-      .where(eq(schema.towingProfiles.userId, providerId));
   }
 }

@@ -6,11 +6,8 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { BookingsService, CreateBookingSchema } from './bookings.service';
-import { AuthGuard } from '../common/guards/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { AuthUser } from '../auth/auth.service';
@@ -21,7 +18,6 @@ const DisputeSchema = z.object({
 });
 
 @Controller('bookings')
-@UseGuards(AuthGuard, RolesGuard)
 export class BookingsController {
   constructor(private bookingsService: BookingsService) {}
 

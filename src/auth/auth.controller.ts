@@ -1,7 +1,9 @@
 import { All, Controller, Req, Res } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { BetterAuthService } from './better-auth.service';
+import { Public } from '../common/decorators/public.decorator';
 
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(private betterAuthService: BetterAuthService) {}
